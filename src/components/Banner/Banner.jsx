@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useCursor } from "@react-three/drei";
+import React, {useState, useRef, useEffect} from "react";
+import {Canvas, useFrame, useThree} from "@react-three/fiber";
+import {useCursor} from "@react-three/drei";
 import * as THREE from "three";
 import styles from "./banner.module.scss";
 
@@ -22,43 +22,53 @@ const Cell = React.forwardRef(
         useCursor(isHovered);
 
         return (
-            <mesh
-                ref={ref}
-                position={position}
-                onPointerOver={(e) => {
-                    e.stopPropagation();
-                    if (isActive) {
-                        setHoveredCell(ref.current);
-                    }
-                }}
-                onPointerOut={(e) => {
-                    e.stopPropagation();
-                    if (isActive) {
-                        setHoveredCell(null);
-                    }
-                }}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    if (isActive) {
-                        onClick(position); // Appeler la fonction de clic sur la case
-                    }
-                }}
-                receiveShadow
-                userData={{ isActiveCell: isActive }}
-            >
-                <boxGeometry args={[cellSize, cellSize, 0.5]} />
-                <meshStandardMaterial
-                    color={isHovered ? "orange" : isActive ? "#d3d3d3" : "white"}
-                />
-            </mesh>
+            <group>
+                <mesh
+                    ref={ref}
+                    position={position}
+                    onPointerOver={(e) => {
+                        e.stopPropagation();
+                        if (isActive) {
+                            setHoveredCell(ref.current);
+                        }
+                    }}
+                    onPointerOut={(e) => {
+                        e.stopPropagation();
+                        if (isActive) {
+                            setHoveredCell(null);
+                        }
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (isActive) {
+                            onClick(position); // Appeler la fonction de clic sur la case
+                        }
+                    }}
+                    receiveShadow
+                    userData={{ isActiveCell: isActive }}
+                >
+                    <boxGeometry args={[cellSize, cellSize, 0.5]} />
+                    <meshStandardMaterial
+                        color={isHovered ? "#007AFF" : isActive ? "#d8d7d7" : "#f5f5f5"}
+
+                    />
+                </mesh>
+
+                {/* Ajoutez les bordures légères */}
+                <lineSegments position={position}>
+                    <edgesGeometry attach="geometry" args={[new THREE.BoxGeometry(cellSize, cellSize, 0.5)]} />
+                    <lineBasicMaterial attach="material" color="#d3d3d3" linewidth={0.5} /> {/* Couleur et épaisseur de la bordure */}
+                </lineSegments>
+            </group>
         );
     }
 );
 
+
 // Composant Grid pour afficher la grille avec les lettres "NEXT"
 const Grid = React.forwardRef(
     (
-        { gridData, setHoveredCell, hoveredCell, cellSize, onCellClick },
+        {gridData, setHoveredCell, hoveredCell, cellSize, onCellClick},
         ref
     ) => {
         const rows = gridData.length;
@@ -102,6 +112,7 @@ const Grid = React.forwardRef(
 );
 
 // Composant DraggableCube pour gérer le cube à déplacer
+// Composant DraggableCube pour gérer le cube à déplacer
 function DraggableCube({
                            position,
                            setPosition,
@@ -110,7 +121,7 @@ function DraggableCube({
                            onCubeClick,
                        }) {
     const meshRef = useRef();
-    const { raycaster, mouse, camera } = useThree();
+    const {raycaster, mouse, camera} = useThree();
     const [isDragging, setIsDragging] = useState(false);
     const [isDropping, setIsDropping] = useState(false);
     useCursor(isDragging);
@@ -129,9 +140,9 @@ function DraggableCube({
                 const snappedY = Math.round(intersect.point.y);
 
                 // Déplacer le cube à la position ajustée et centré
-                meshRef.current.position.set(snappedX, snappedY, 1.5); // Hauteur pendant le drag
+                meshRef.current.position.set(snappedX, snappedY, 1.2); // Hauteur pendant le drag
             }
-        } else if (isDropping && meshRef.current) {
+        } else if (isDropping && meshRef.current && targetPosition) {
             // Animation de la chute du cube
             if (meshRef.current.position.z > targetPosition[2]) {
                 meshRef.current.position.z -= 0.2; // Ajustez la vitesse de chute
@@ -162,17 +173,27 @@ function DraggableCube({
             onPointerUp={(e) => {
                 e.stopPropagation();
                 setIsDragging(false); // Arrête de déplacer le cube lorsque le clic de la souris est relâché
+                setIsDropping(true); // Active la chute du cube lorsque la souris est relâchée
             }}
             scale={isDragging ? [1.1, 1.1, 1.1] : [1, 1, 1]}
             castShadow
         >
-            <boxGeometry args={[1, 1, 1]} />
-            <meshStandardMaterial color="red" />
+            <boxGeometry args={[1, 1, 1]}/>
+            <meshStandardMaterial
+                color="#0400ff"
+                opacity={0.7}  // Transparence pour l'effet de glaçon
+                transparent={true}
+                roughness={0.7}
+                metalness={0.5}
+                envMapIntensity={10}
+            />
+            05167EFF
+
         </mesh>
     );
 }
 
-// Composant principal Banner
+
 // Composant principal Banner
 export default function Banner() {
     const cellSize = 1;
@@ -236,14 +257,15 @@ export default function Banner() {
     return (
         <div className={styles.banner}>
             <Canvas
-                camera={{ position: [0, -5, 15], fov: 50 }}
+                camera={{position: [0, -5, 15], fov: 50}}
                 shadows
-                style={{ backgroundColor: "#ffffff" }}
+                style={{backgroundColor: "#000000"}} // Arrière-plan blanc cassé
             >
-                <ambientLight intensity={0.5} />
+                <ambientLight intensity={2}/>
+                {/* Ajusté pour donner plus de luminosité */}
                 <directionalLight
                     position={[10, 20, 10]}
-                    intensity={0.7}
+                    intensity={1.5}
                     castShadow
                     shadow-mapSize-width={1024}
                     shadow-mapSize-height={1024}
@@ -258,9 +280,9 @@ export default function Banner() {
                     ref={planeRef}
                 />
 
-                <mesh ref={planeRef} position={[0, 0, 0]} rotation={[0, 0, 0]} visible={false}>
-                    <planeGeometry args={[100, 100]} />
-                    <meshBasicMaterial transparent opacity={0} />
+                <mesh ref={planeRef} position={[0, 0, 0]} rotation={[0, 0, 0]} visible={true}>
+                    <planeGeometry args={[100, 100]}/>
+                    <meshBasicMaterial transparent opacity={1}/>
                 </mesh>
 
                 <DraggableCube
