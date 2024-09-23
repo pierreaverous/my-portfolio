@@ -1,0 +1,21 @@
+/* app/home.module.scss */
+.main {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #f0f0f0;
+  padding: 0 20px;
+  text-align: center;
+}
+
+.title {
+  font-size: 4rem;
+  color: #333;
+}
+
+.description {
+  font-size: 1.2rem;
+  color: #555;
+}
