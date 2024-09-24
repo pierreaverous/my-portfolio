@@ -1,165 +1,159 @@
 "use client";
 
-import React, {useState, useRef, useEffect} from "react";
-import {Canvas, useFrame, useThree} from "@react-three/fiber";
-import {useCursor} from "@react-three/drei";
+import React, { useState, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useCursor } from "@react-three/drei";
 import * as THREE from "three";
 import styles from "./banner.module.scss";
 
+// Fonction utilitaire pour obtenir les positions des cubes à partir de la matrice d'une lettre
+const getLetterPositions = (letterGrid, baseX, baseY) => {
+    const positions = [];
+    const rows = letterGrid.length;
+    const cols = letterGrid[0].length;
+
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            if (letterGrid[row][col] === 1) {
+                positions.push([
+                    baseX + col,
+                    baseY - row,
+                    0.5, // z-position
+                ]);
+            }
+        }
+    }
+    return positions;
+};
+
+// Fonction pour générer les données de la grille et les colonnes de départ des lettres
+const generateGridData = (letters) => {
+    const rows = letters[0].length;
+    const totalCols = letters.reduce((acc, letter) => acc + letter[0].length + 1, -1);
+    const gridData = Array.from({ length: rows }, () => Array(totalCols).fill(0));
+
+    let currentCol = 0;
+    const letterStartCols = [];
+
+    letters.forEach((letter) => {
+        letterStartCols.push(currentCol); // Enregistrer la colonne de départ de la lettre
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < letter[0].length; col++) {
+                gridData[row][currentCol + col] = letter[row][col];
+            }
+        }
+        currentCol += letter[0].length + 1; // Ajouter un espace entre les lettres
+    });
+
+    return { gridData, letterStartCols };
+};
+
 // Composant Cell représentant chaque case de la grille
-const Cell = React.forwardRef(
-    (
-        {
-            isActive,
-            position,
-            setHoveredCell,
-            isHovered,
-            cellSize,
-            onClick,
-        },
-        ref
-    ) => {
-        useCursor(isHovered);
+const Cell = React.forwardRef(({ position, isActive, isHovered, onClick }, ref) => {
+    useCursor(isHovered);
+    return (
+        <group>
+            <mesh
+                ref={ref}
+                position={position}
+                onPointerOver={(e) => {
+                    e.stopPropagation();
+                    if (isActive) onClick(position, true);
+                }}
+                onPointerOut={(e) => {
+                    e.stopPropagation();
+                    if (isActive) onClick(position, false);
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (isActive) onClick(position);
+                }}
+                receiveShadow
+            >
+                <boxGeometry args={[1, 1, 0.5]} />
+                <meshStandardMaterial color={isHovered ? "#007AFF" : isActive ? "#d8d7d7" : "#f5f5f5"} />
+            </mesh>
+            <lineSegments position={position}>
+                <edgesGeometry attach="geometry" args={[new THREE.BoxGeometry(1, 1, 0.5)]} />
+                <lineBasicMaterial attach="material" color="#d3d3d3" linewidth={0.5} />
+            </lineSegments>
+        </group>
+    );
+});
 
-        return (
-            <group>
-                <mesh
-                    ref={ref}
-                    position={position}
-                    onPointerOver={(e) => {
-                        e.stopPropagation();
-                        if (isActive) {
-                            setHoveredCell(ref.current);
-                        }
-                    }}
-                    onPointerOut={(e) => {
-                        e.stopPropagation();
-                        if (isActive) {
-                            setHoveredCell(null);
-                        }
-                    }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (isActive) {
-                            onClick(position); // Appeler la fonction de clic sur la case
-                        }
-                    }}
-                    receiveShadow
-                    userData={{ isActiveCell: isActive }}
-                >
-                    <boxGeometry args={[cellSize, cellSize, 0.5]} />
-                    <meshStandardMaterial
-                        color={isHovered ? "#007AFF" : isActive ? "#d8d7d7" : "#f5f5f5"}
+// Composant Grid pour afficher la grille avec les lettres
+const Grid = ({ gridData, hoveredCell, setHoveredCell, onCellClick }) => {
+    const rows = gridData.length;
+    const cols = gridData[0].length;
 
-                    />
-                </mesh>
+    return (
+        <group>
+            {gridData.map((row, rowIndex) =>
+                row.map((cell, colIndex) => {
+                    const isActive = cell === 1;
+                    const position = [
+                        colIndex - Math.floor(cols / 2),
+                        Math.floor(rows / 2) - rowIndex,
+                        0,
+                    ];
 
-                {/* Ajoutez les bordures légères */}
-                <lineSegments position={position}>
-                    <edgesGeometry attach="geometry" args={[new THREE.BoxGeometry(cellSize, cellSize, 0.5)]} />
-                    <lineBasicMaterial attach="material" color="#d3d3d3" linewidth={0.5} /> {/* Couleur et épaisseur de la bordure */}
-                </lineSegments>
-            </group>
-        );
-    }
-);
+                    const isHovered = hoveredCell
+                        ? hoveredCell[0] === position[0] && hoveredCell[1] === position[1]
+                        : false;
 
-
-// Composant Grid pour afficher la grille avec les lettres "NEXT"
-const Grid = React.forwardRef(
-    (
-        {gridData, setHoveredCell, hoveredCell, cellSize, onCellClick},
-        ref
-    ) => {
-        const rows = gridData.length;
-        const cols = gridData[0].length;
-
-        return (
-            <group ref={ref}>
-                {gridData.map((row, rowIndex) =>
-                    row.map((cell, colIndex) => {
-                        const isActive = cell === 1;
-                        const position = [
-                            (colIndex - cols / 2 + 0.5) * cellSize,
-                            (rows / 2 - rowIndex - 0.5) * cellSize,
-                            0,
-                        ];
-
-                        const isHovered =
-                            hoveredCell &&
-                            hoveredCell.position.x === position[0] &&
-                            hoveredCell.position.y === position[1];
-
-                        const cellRef = useRef();
-
-                        return (
-                            <Cell
-                                key={`${rowIndex}-${colIndex}`}
-                                ref={cellRef}
-                                isActive={isActive}
-                                position={position}
-                                isHovered={isHovered}
-                                setHoveredCell={setHoveredCell}
-                                cellSize={cellSize}
-                                onClick={onCellClick} // Ajouté pour gérer le clic
-                            />
-                        );
-                    })
-                )}
-            </group>
-        );
-    }
-);
+                    return (
+                        <Cell
+                            key={`${rowIndex}-${colIndex}`}
+                            position={position}
+                            isActive={isActive}
+                            isHovered={isHovered}
+                            onClick={(pos, hover) => {
+                                if (hover !== undefined) {
+                                    setHoveredCell(hover ? pos : null);
+                                } else {
+                                    onCellClick(pos);
+                                }
+                            }}
+                        />
+                    );
+                })
+            )}
+        </group>
+    );
+};
 
 // Composant DraggableCube pour gérer le cube à déplacer
-// Composant DraggableCube pour gérer le cube à déplacer
-function DraggableCube({
-                           position,
-                           setPosition,
-                           targetPosition,
-                           planeRef,
-                           onCubeClick,
-                       }) {
+const DraggableCube = ({ position, cubeIndex, onDrop, planeRef }) => {
     const meshRef = useRef();
-    const {raycaster, mouse, camera} = useThree();
+    const { raycaster, mouse, camera } = useThree();
     const [isDragging, setIsDragging] = useState(false);
     const [isDropping, setIsDropping] = useState(false);
     useCursor(isDragging);
 
     useFrame(() => {
         if (isDragging && meshRef.current && planeRef.current) {
-            // Le cube suit le curseur tant que le clic de la souris est maintenu
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObject(planeRef.current);
 
             if (intersects.length > 0) {
                 const intersect = intersects[0];
 
-                // Centrer le cube sous le curseur en utilisant cellSize
                 const snappedX = Math.round(intersect.point.x);
                 const snappedY = Math.round(intersect.point.y);
 
-                // Déplacer le cube à la position ajustée et centré
                 meshRef.current.position.set(snappedX, snappedY, 1.2); // Hauteur pendant le drag
             }
-        } else if (isDropping && meshRef.current && targetPosition) {
-            // Animation de la chute du cube
-            if (meshRef.current.position.z > targetPosition[2]) {
-                meshRef.current.position.z -= 0.2; // Ajustez la vitesse de chute
-                if (meshRef.current.position.z <= targetPosition[2]) {
-                    meshRef.current.position.z = targetPosition[2];
+        } else if (isDropping && meshRef.current) {
+            if (meshRef.current.position.z > 0.5) {
+                meshRef.current.position.z -= 0.2;
+                if (meshRef.current.position.z <= 0.5) {
+                    meshRef.current.position.z = 0.5;
                     setIsDropping(false);
+                    onDrop(meshRef.current.position, cubeIndex);
                 }
             }
         }
     });
-
-    useEffect(() => {
-        if (targetPosition) {
-            setPosition([targetPosition[0], targetPosition[1], 1]); // Positionner le cube au-dessus de la case cible
-            setIsDropping(true); // Activer la chute
-        }
-    }, [targetPosition, setPosition]);
 
     return (
         <mesh
@@ -167,102 +161,162 @@ function DraggableCube({
             position={position}
             onPointerDown={(e) => {
                 e.stopPropagation();
-                setIsDragging(true); // Commence à déplacer le cube au clic
-                if (onCubeClick) onCubeClick(); // Simuler l'action de clic sur le cube
+                setIsDragging(true);
             }}
             onPointerUp={(e) => {
                 e.stopPropagation();
-                setIsDragging(false); // Arrête de déplacer le cube lorsque le clic de la souris est relâché
-                setIsDropping(true); // Active la chute du cube lorsque la souris est relâchée
+                setIsDragging(false);
+                setIsDropping(true);
             }}
             scale={isDragging ? [1.1, 1.1, 1.1] : [1, 1, 1]}
             castShadow
         >
-            <boxGeometry args={[1, 1, 1]}/>
+            <boxGeometry args={[1, 1, 1]} />
             <meshStandardMaterial
                 color="#0400ff"
-                opacity={0.7}  // Transparence pour l'effet de glaçon
+                opacity={0.7}
                 transparent={true}
                 roughness={0.7}
                 metalness={0.5}
                 envMapIntensity={10}
             />
-            05167EFF
-
         </mesh>
     );
-}
-
+};
 
 // Composant principal Banner
 export default function Banner() {
     const cellSize = 1;
 
-    const letterN = [
-        [1, 0, 0, 0, 1],
-        [1, 1, 0, 0, 1],
-        [1, 0, 1, 0, 1],
-        [1, 0, 0, 1, 1],
-        [1, 0, 0, 0, 1],
+    // Vos lettres telles que vous les avez définies
+    const letters = [
+        // Lettre P
+        [
+            [1, 1, 1, 1, 1], // Ligne 1
+            [1, 0, 0, 0, 1], // Ligne 2
+            [1, 1, 1, 1, 1], // Ligne 3
+            [1, 0, 0, 0, 0], // Ligne 4
+            [1, 0, 0, 0, 0], // Ligne 5
+        ],
+        // Lettre G
+        [
+            [0, 1, 1, 1, 0], // Ligne 1
+            [1, 0, 0, 0, 0], // Ligne 2
+            [1, 0, 1, 1, 1], // Ligne 3
+            [1, 0, 0, 0, 1], // Ligne 4
+            [0, 1, 1, 1, 0], // Ligne 5
+        ],
+        // Lettre A
+        [
+            [0, 1, 1, 1, 0], // Ligne 1
+            [1, 0, 0, 0, 1], // Ligne 2
+            [1, 1, 1, 1, 1], // Ligne 3
+            [1, 0, 0, 0, 1], // Ligne 4
+            [1, 0, 0, 0, 1], // Ligne 5
+        ],
     ];
 
-    const letterE = [
-        [1, 1, 1, 1, 1],
-        [1, 0, 0, 0, 0],
-        [1, 1, 1, 1, 0],
-        [1, 0, 0, 0, 0],
-        [1, 1, 1, 1, 1],
+    // Générer les données de la grille en combinant les lettres
+    const { gridData, letterStartCols } = generateGridData(letters);
+
+    // Positions initiales des cubes à déplacer
+    const initialCubePositions = [
+        [0, -6, 0.5],
+        [2, -6, 0.5],
+        [-2, -6, 0.5],
+        [4, -6, 0.5],
+        [-4, -6, 0.5],
+        [6, -6, 0.5],
     ];
 
-    const letterX = [
-        [1, 0, 0, 0, 1],
-        [0, 1, 0, 1, 0],
-        [0, 0, 1, 0, 0],
-        [0, 1, 0, 1, 0],
-        [1, 0, 0, 0, 1],
-    ];
-
-    const letterT = [
-        [1, 1, 1, 1, 1],
-        [0, 0, 1, 0, 0],
-        [0, 0, 1, 0, 0],
-        [0, 0, 1, 0, 0],
-        [0, 0, 1, 0, 0],
-    ];
-
-    const gridData = [];
-    for (let i = 0; i < 5; i++) {
-        gridData.push([
-            ...letterN[i],
-            0,
-            ...letterE[i],
-            0,
-            ...letterX[i],
-            0,
-            ...letterT[i],
-        ]);
-    }
-
-    const [cubePosition, setCubePosition] = useState([0, -6, 0.5]);
     const [hoveredCell, setHoveredCell] = useState(null);
-    const [targetPosition, setTargetPosition] = useState(null);
+    const [filledLetters, setFilledLetters] = useState(new Array(letters.length).fill(false));
+    const [letterCubeIndices, setLetterCubeIndices] = useState(
+        new Array(letters.length).fill().map(() => new Set())
+    );
+    const [newCubes, setNewCubes] = useState([]);
+    const [cubePositions, setCubePositions] = useState(initialCubePositions);
 
     const planeRef = useRef();
 
-    const handleCellClick = (position) => {
-        // Vous pouvez décider d'autres actions à réaliser lors d'un clic sur la case.
-        setTargetPosition([position[0], position[1], 0.5]); // Définir la position cible de la case cliquée
+    // Gestion du dépôt d'un cube sur la grille
+    const handleCubeDrop = (position, cubeIndex) => {
+        // Détecter la lettre correspondante en fonction de la position X
+        let letterIndex = -1;
+        let cumulativeOffset = 0;
+
+        for (let i = 0; i < letters.length; i++) {
+            const letterWidth = letters[i][0].length;
+            const startX = cumulativeOffset - Math.floor(gridData[0].length / 2);
+            const endX = startX + letterWidth;
+            if (position.x >= startX && position.x < endX) {
+                letterIndex = i;
+                break;
+            }
+            cumulativeOffset += letterWidth + 1;
+        }
+
+        if (letterIndex !== -1) {
+            // Vérifier si le cube est parmi les cubes initiaux
+            if (cubeIndex < initialCubePositions.length) {
+                const updatedLetterCubeIndices = [...letterCubeIndices];
+                updatedLetterCubeIndices[letterIndex].add(cubeIndex);
+                setLetterCubeIndices(updatedLetterCubeIndices);
+
+                // Si au moins deux cubes sont placés sur la lettre
+                if (
+                    updatedLetterCubeIndices[letterIndex].size >= 2 &&
+                    !filledLetters[letterIndex]
+                ) {
+                    fillLetter(letterIndex);
+                }
+            }
+        }
+    };
+
+    // Fonction pour remplir la lettre avec les cubes qui tombent
+    const fillLetter = (letterIndex) => {
+        const baseX = letterStartCols[letterIndex] - Math.floor(gridData[0].length / 2);
+        const baseY = Math.floor(gridData.length / 2);
+
+        const allPositions = getLetterPositions(
+            letters[letterIndex],
+            baseX,
+            baseY
+        );
+
+        // Trier les positions pour l'effet de chute
+        allPositions.sort((a, b) => b[1] - a[1]);
+
+        // Ajouter les cubes avec un délai
+        allPositions.forEach((pos, idx) => {
+            setTimeout(() => {
+                setNewCubes((prev) => [...prev, pos]);
+            }, idx * 100); // Délai de 100ms entre chaque cube
+        });
+
+        // Mettre à jour l'état des lettres remplies
+        const updatedFilledLetters = [...filledLetters];
+        updatedFilledLetters[letterIndex] = true;
+        setFilledLetters(updatedFilledLetters);
+
+        // Réinitialiser les cubes placés sur la lettre
+        const updatedLetterCubeIndices = [...letterCubeIndices];
+        updatedLetterCubeIndices[letterIndex] = new Set();
+        setLetterCubeIndices(updatedLetterCubeIndices);
+
+        // Réinitialiser les positions des cubes utilisés
+        const updatedCubePositions = [...cubePositions];
+        updatedLetterCubeIndices[letterIndex].forEach((idx) => {
+            updatedCubePositions[idx] = initialCubePositions[idx];
+        });
+        setCubePositions(updatedCubePositions);
     };
 
     return (
         <div className={styles.banner}>
-            <Canvas
-                camera={{position: [0, -5, 15], fov: 50}}
-                shadows
-                style={{backgroundColor: "#000000"}} // Arrière-plan blanc cassé
-            >
-                <ambientLight intensity={2}/>
-                {/* Ajusté pour donner plus de luminosité */}
+            <Canvas camera={{ position: [0, -5, 15], fov: 50 }} shadows>
+                <ambientLight intensity={2} />
                 <directionalLight
                     position={[10, 20, 10]}
                     intensity={1.5}
@@ -273,24 +327,46 @@ export default function Banner() {
 
                 <Grid
                     gridData={gridData}
-                    setHoveredCell={setHoveredCell}
                     hoveredCell={hoveredCell}
-                    cellSize={cellSize}
-                    onCellClick={handleCellClick}
-                    ref={planeRef}
+                    setHoveredCell={setHoveredCell}
+                    onCellClick={() => {}}
                 />
 
-                <mesh ref={planeRef} position={[0, 0, 0]} rotation={[0, 0, 0]} visible={true}>
-                    <planeGeometry args={[100, 100]}/>
-                    <meshBasicMaterial transparent opacity={1}/>
+                <mesh
+                    ref={planeRef}
+                    position={[0, 0, 0]}
+                    rotation={[0, 0, 0]}
+                    visible={false} // Rendre le plan invisible
+                >
+                    <planeGeometry args={[100, 100]} />
+                    <meshBasicMaterial transparent opacity={0} />
                 </mesh>
 
-                <DraggableCube
-                    position={cubePosition}
-                    setPosition={setCubePosition}
-                    targetPosition={targetPosition}
-                    planeRef={planeRef}
-                />
+                {/* Affichage des nouveaux cubes qui remplissent les lettres */}
+                {newCubes.map((position, index) => (
+                    <mesh key={`new-cube-${index}`} position={position} castShadow>
+                        <boxGeometry args={[1, 1, 1]} />
+                        <meshStandardMaterial
+                            color="#0400ff"
+                            opacity={0.7}
+                            transparent={true}
+                            roughness={0.7}
+                            metalness={0.5}
+                            envMapIntensity={10}
+                        />
+                    </mesh>
+                ))}
+
+                {/* Affichage des cubes à déplacer */}
+                {cubePositions.map((position, index) => (
+                    <DraggableCube
+                        key={`cube-${index}`}
+                        position={position}
+                        cubeIndex={index}
+                        onDrop={handleCubeDrop}
+                        planeRef={planeRef}
+                    />
+                ))}
             </Canvas>
         </div>
     );
