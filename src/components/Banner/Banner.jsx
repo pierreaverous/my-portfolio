@@ -266,7 +266,7 @@ const ExplodingCube = ({ position, cubeIndex, onExplosionComplete }) => {
         setRotationSpeed(randomRotation);
 
         // Durée de l'animation d'explosion
-        const explosionDuration = 2000; // 2 secondes
+        const explosionDuration = 1000; // 2 secondes
 
         // Notifier la fin de l'explosion après la durée spécifiée
         const timeout = setTimeout(() => {
@@ -362,7 +362,7 @@ const ExplodingCell = ({ position, cellIndex, onExplosionComplete }) => {
         setRotationSpeed(randomRotation);
 
         // Durée de l'animation d'explosion
-        const explosionDuration = 2000; // 2 secondes
+        const explosionDuration = 1000; // 2 secondes
 
         // Notifier la fin de l'explosion après la durée spécifiée
         const timeout = setTimeout(() => {
@@ -475,23 +475,68 @@ const LogoMeshes = ({ svgUrl, groupRef, setMeshesLoaded }) => {
                 (data) => {
                     console.log("SVG logo loaded successfully.");
                     const paths = data.paths;
-                    const material = new THREE.MeshStandardMaterial({
-                        color: "#0400ff",
-                        side: THREE.DoubleSide,
-                        metalness: 0.5,
-                        roughness: 0.5,
-                    });
+
+                    // Définir une palette de couleurs
+                    const colors = [
+                        "#0139ff",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#0139ff",
+                        "#1d1d1b",
+                        "#0139ff",
+
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        "#1d1d1b",
+                        // Ajoutez plus de couleurs si nécessaire
+                    ];
 
                     paths.forEach((path, pathIndex) => {
-                        const shapes = path.toShapes(true);
+                        // Assigner une couleur basée sur l'index du chemin
+                        const color = colors[pathIndex % colors.length];
+
+                        // Créer un matériau distinct pour chaque couleur
+                        const material = new THREE.MeshStandardMaterial({
+                            color: color,
+                            side: THREE.DoubleSide,
+                            metalness: 0.5,
+                            roughness: 0.5,
+                        });
+
+                        // Convertir le chemin en formes, en incluant les trous
+                        const shapes = path.toShapes(false);
                         shapes.forEach((shape, shapeIndex) => {
                             const geometry = new THREE.ExtrudeGeometry(shape, {
-                                depth: 10, // Profondeur minimale pour le 3D
-                                bevelEnabled: false,
+                                depth: 7,
+                                bevelEnabled: true,
+                                bevelThickness: 0.5,
+                                bevelSize: 0.5,
+                                bevelSegments: 1,
+                                curveSegments: 12,
+                                steps: 1,
                             });
                             const mesh = new THREE.Mesh(geometry, material);
                             groupRef.current.add(mesh);
-                            console.log(`Mesh added: Path ${pathIndex}, Shape ${shapeIndex}`);
+                            console.log(`Mesh added: Path ${pathIndex}, Shape ${shapeIndex} with color ${color}`);
                         });
                     });
 
@@ -529,7 +574,7 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
     // Graduellement augmenter l'échelle du logo pendant l'étape 'logo'
     useFrame(() => {
         if (animationStep === "logo" && meshesLoaded && groupRef.current) {
-            const targetScale = 0.05; // Ajustez l'échelle cible selon vos besoins
+            const targetScale = 0.04; // Ajustez l'échelle cible selon vos besoins
             const newScale = THREE.MathUtils.lerp(scale, targetScale, 0.09);
             setScale(newScale);
             groupRef.current.scale.set(newScale, newScale, newScale);
@@ -540,7 +585,7 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
         <>
             <group
                 ref={groupRef}
-                position={[-9.5, 8, 3]}
+                position={[-10, 8, 3]}
                 rotation={rotation} // Appliquer la rotation
                 visible={animationStep === "logo"}
             >
@@ -629,7 +674,7 @@ const CameraController = ({ setAnimationStep }) => {
 // -----------------------------
 
 export default function Banner() {
-    const svgUrl = "/WEB.svg"; // Assurez-vous que ce chemin est correct et accessible
+    const svgUrl = "/logo.svg"; // Assurez-vous que ce chemin est correct et accessible
 
     // Définir vos lettres
     const letters = [
