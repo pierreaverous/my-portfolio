@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Canvas, useFrame, useThree, useLoader } from "@react-three/fiber";
-import { useCursor } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import {OrbitControls, useCursor} from "@react-three/drei";
 import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader";
 import styles from "./banner.module.scss";
+import {EffectComposer, Outline, Bloom, DepthOfField, Glitch, } from "@react-three/postprocessing"; // Import post-processing
 
-// Fonction utilitaire pour obtenir les positions des cubes à partir de la matrice d'une lettre
+
+// Utility function to get cube positions from a letter grid
 const getLetterPositions = (letterGrid, baseX, baseY) => {
     const positions = [];
     const rows = letterGrid.length;
@@ -23,7 +25,7 @@ const getLetterPositions = (letterGrid, baseX, baseY) => {
     return positions;
 };
 
-// Fonction pour générer les données de la grille et les colonnes de départ des lettres
+// Function to generate grid data and starting columns for letters
 const generateGridData = (letters) => {
     const rows = letters[0].length;
     const totalCols = letters.reduce((acc, letter) => acc + letter[0].length + 1, -1);
@@ -33,19 +35,19 @@ const generateGridData = (letters) => {
     const letterStartCols = [];
 
     letters.forEach((letter) => {
-        letterStartCols.push(currentCol); // Enregistrer la colonne de départ de la lettre
+        letterStartCols.push(currentCol); // Record the starting column of the letter
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < letter[0].length; col++) {
                 gridData[row][currentCol + col] = letter[row][col];
             }
         }
-        currentCol += letter[0].length + 1; // Ajouter un espace entre les lettres
+        currentCol += letter[0].length + 1; // Add space between letters
     });
 
     return { gridData, letterStartCols };
 };
 
-// Composant Cell représentant chaque case de la grille
+// Cell component representing each grid cell
 const Cell = React.forwardRef(
     ({ position, isActive, isHovered, onClick, animationStep }, ref) => {
         useCursor(isHovered);
@@ -67,7 +69,7 @@ const Cell = React.forwardRef(
                         if (isActive && animationStep === "filling") onClick(position);
                     }}
                     receiveShadow
-                    visible={animationStep !== "disappear"} // Cacher les cases lors de la disparition
+                    visible={animationStep !== "disappear"} // Hide cells during disappearance
                 >
                     <boxGeometry args={[1, 1, 0.5]} />
                     <meshStandardMaterial
@@ -85,7 +87,7 @@ const Cell = React.forwardRef(
     }
 );
 
-// Composant Grid pour afficher la grille avec les lettres
+// Grid component to display the grid with letters
 const Grid = ({
                   gridData,
                   hoveredCell,
@@ -134,7 +136,7 @@ const Grid = ({
     );
 };
 
-// Composant DraggableCube pour gérer le cube à déplacer
+// DraggableCube component to manage draggable cubes
 const DraggableCube = ({
                            position,
                            cubeIndex,
@@ -149,7 +151,7 @@ const DraggableCube = ({
     const [isDisappearing, setIsDisappearing] = useState(false);
     useCursor(isDragging);
 
-    // Animation de disparition
+    // Disappearance animation
     useEffect(() => {
         if (animationStep === "disappear" && meshRef.current) {
             setIsDisappearing(true);
@@ -157,6 +159,8 @@ const DraggableCube = ({
     }, [animationStep]);
 
     useFrame(() => {
+        if (animationStep !== "filling") return; // Only allow dragging during 'filling'
+
         if (isDragging && meshRef.current && planeRef.current) {
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObject(planeRef.current);
@@ -167,7 +171,7 @@ const DraggableCube = ({
                 const snappedX = Math.round(intersect.point.x);
                 const snappedY = Math.round(intersect.point.y);
 
-                meshRef.current.position.set(snappedX, snappedY, 1.2); // Hauteur pendant le drag
+                meshRef.current.position.set(snappedX, snappedY, 1.2); // Height during drag
             }
         } else if (isDropping && meshRef.current) {
             if (meshRef.current.position.z > 0.5) {
@@ -180,9 +184,9 @@ const DraggableCube = ({
             }
         }
 
-        // Animation de disparition
+        // Disappearance animation
         if (isDisappearing && meshRef.current) {
-            // Réduire l'échelle et l'opacité pour faire disparaître
+            // Gradually reduce scale and opacity to disappear
             meshRef.current.scale.lerp(new THREE.Vector3(0, 0, 0), 0.05);
             meshRef.current.material.opacity = THREE.MathUtils.lerp(
                 meshRef.current.material.opacity,
@@ -190,7 +194,7 @@ const DraggableCube = ({
                 0.05
             );
             if (meshRef.current.scale.x < 0.01) {
-                // Une fois l'animation terminée, cacher le mesh
+                // Once the animation is complete, hide the mesh
                 meshRef.current.visible = false;
             }
         }
@@ -213,6 +217,7 @@ const DraggableCube = ({
             }}
             scale={isDragging ? [1.1, 1.1, 1.1] : [1, 1, 1]}
             castShadow
+            visible={animationStep !== "disappear"} // Control visibility
         >
             <boxGeometry args={[1, 1, 1]} />
             <meshStandardMaterial
@@ -227,43 +232,71 @@ const DraggableCube = ({
     );
 };
 
-// Composant enfant pour charger et ajouter les meshes du logo SVG
-// Composant enfant pour charger et ajouter les meshes du logo SVG
+// LogoMeshes component to load and add SVG meshes with extrusion
 const LogoMeshes = ({ svgUrl, groupRef, setMeshesLoaded }) => {
     useEffect(() => {
         if (groupRef.current) {
-            console.log("Début du chargement du logo SVG...");
+            console.log("Starting SVG logo loading...");
             const loader = new SVGLoader();
             loader.load(
                 svgUrl,
                 (data) => {
-                    console.log("Logo SVG chargé avec succès.");
+                    console.log("SVG logo loaded successfully.");
                     const paths = data.paths;
-                    const material = new THREE.MeshBasicMaterial({
+                    const material = new THREE.MeshStandardMaterial({
                         color: "#0400ff",
                         side: THREE.DoubleSide,
-                        depthWrite: false,
+                        metalness: 0.5,
+                        roughness: 0.5,
                         transparent: true,
-                        opacity: 0.8,
+                        opacity: 0 // Start with full transparency
                     });
 
                     paths.forEach((path, pathIndex) => {
                         const shapes = path.toShapes(true);
                         shapes.forEach((shape, shapeIndex) => {
-                            const geometry = new THREE.ShapeGeometry(shape);
+                            const geometry = new THREE.ExtrudeGeometry(shape, {
+                                depth: 10, // Depth for 3D appearance
+                                bevelEnabled: false,
+                            });
                             const mesh = new THREE.Mesh(geometry, material);
+
+                            // Save the final position
+                            const finalPosition = geometry.boundingBox.getCenter(new THREE.Vector3());
+
+                            // Start each mesh at the center
+                            mesh.position.set(0, 0, 0);
+                            mesh.scale.set(0.1, 0.1, 0.1); // Start with a small scale
+
+                            // Add the mesh to the group
                             groupRef.current.add(mesh);
-                            console.log(`Mesh ajouté: Path ${pathIndex}, Shape ${shapeIndex}`);
+                            console.log(`Mesh added: Path ${pathIndex}, Shape ${shapeIndex}`);
+
+                            // Animate the mesh's movement to its final position
+                            let frame = 0;
+                            const animate = () => {
+                                if (frame <= 100) {
+                                    requestAnimationFrame(animate);
+                                    // Lerp the position from the center to the final position
+                                    mesh.position.lerp(finalPosition, 0.05);
+                                    mesh.scale.lerp(new THREE.Vector3(1, 1, 1), 0.05); // Gradually scale up
+                                    mesh.material.opacity += 0.05; // Fade in
+                                    frame++;
+                                } else {
+                                    mesh.position.copy(finalPosition); // Ensure the final position is correct
+                                }
+                            };
+                            animate();
                         });
                     });
 
                     setMeshesLoaded(true);
                 },
                 (xhr) => {
-                    console.log(`Chargement du SVG: ${Math.round((xhr.loaded / xhr.total) * 100)}% complété.`);
+                    console.log(`Loading SVG: ${Math.round((xhr.loaded / xhr.total) * 100)}% completed.`);
                 },
                 (error) => {
-                    console.error("Erreur lors du chargement du SVG:", error);
+                    console.error("Error loading SVG:", error);
                 }
             );
         }
@@ -272,67 +305,102 @@ const LogoMeshes = ({ svgUrl, groupRef, setMeshesLoaded }) => {
     return null;
 };
 
-// Composant pour afficher le logo SVG en 3D avec animation stylée
-const LogoDisplay = ({ svgUrl, animationStep }) => {
+
+const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
     const groupRef = useRef();
     const [meshesLoaded, setMeshesLoaded] = useState(false);
+    const [scale, setScale] = useState(0.01); // Start with a small scale
 
     useEffect(() => {
         if (animationStep === "logo") {
-            console.log("Étape d'animation 'logo' activée.");
+            console.log("Logo animation step activated.");
         }
     }, [animationStep]);
 
-    // Animation de transition 3D
+    // Gradually scale up the logo during the 'logo' animation step
     useFrame(() => {
         if (animationStep === "logo" && meshesLoaded && groupRef.current) {
-            // Augmenter l'échelle progressivement
-            if (groupRef.current.scale.x < 1) {
-                const newScale = THREE.MathUtils.lerp(
-                    groupRef.current.scale.x,
-                    0,
-                    0.05
-                );
-                groupRef.current.scale.set(newScale, newScale, newScale);
-                console.log(`Échelle du groupe SVG: ${newScale}`);
-            }
-
-            // Rotation douce
-            groupRef.current.rotation.y += 0.005;
+            const targetScale = 0.05; // Adjust target scale as needed
+            const newScale = THREE.MathUtils.lerp(scale, targetScale, 0.09);
+            setScale(newScale);
+            groupRef.current.scale.set(newScale, newScale, newScale);
         }
     });
 
     return (
-        animationStep === "logo" && (
-            <group ref={groupRef} position={[0, -5, 15]}>
-                {/* Les meshes sont ajoutés via LogoMeshes */}
-                <LogoMeshes
-                    svgUrl={svgUrl}
-                    groupRef={groupRef}
-                    setMeshesLoaded={setMeshesLoaded}
-                />
+        <>
+            <group
+                ref={groupRef}
+                position={[-9.5, 8, 3]}
+                rotation={rotation} // Apply rotation
+                visible={animationStep === "logo"}
+            >
+                {/* Add the SVG meshes to the group */}
+                {animationStep === "logo" && (
+                    <LogoMeshes
+                        svgUrl={svgUrl}
+                        groupRef={groupRef}
+                        setMeshesLoaded={setMeshesLoaded}
+                    />
+                )}
             </group>
-        )
+
+            {/* Apply bloom, glow, depth of field, and glitch effects */}
+            {animationStep === "logo" && (
+                <EffectComposer>
+                    {/* Bloom effect */}
+                    <Bloom
+                        luminanceThreshold={0.1} // Adjust threshold for glowing parts
+                        luminanceSmoothing={0.9}
+                        intensity={1.5} // Intensity of the bloom effect
+                    />
+                    {/* Outline effect for glow */}
+                    <Outline
+                        blur
+                        edgeStrength={3} // Adjust for stronger glow
+                        pulseSpeed={0.6}
+                        visibleEdgeColor="#ffffff"
+                        hiddenEdgeColor="#000000"
+                        width={1024}
+                        height={1024}
+                    />
+                    {/* Depth of Field (Blur) effect */}
+
+                    {/*/!* Optional: Glitch effect for a digital distortion *!/*/}
+                    {/*<Glitch*/}
+                    {/*    delay={[2.5, 5.5]} // Time between glitches*/}
+                    {/*    duration={[0.3, 1.0]} // Duration of each glitch*/}
+                    {/*    strength={[0.1, 0.3]} // Intensity of the glitch effect*/}
+                    {/*/>*/}
+                </EffectComposer>
+            )}
+        </>
     );
 };
-
-// Composant CameraController pour gérer l'animation de la caméra
-const CameraController = ({ animationStep, targetRotation, setAnimationStep }) => {
-    const { camera } = useThree();
+// CameraController component to manage camera animations
+const CameraController = ({setAnimationStep}) => {
+    const {camera} = useThree();
     const [completed, setCompleted] = useState(false);
+    const targetPosition = new THREE.Vector3(0, -5, 15);
+    const targetRotation = new THREE.Euler(0.18, 0, 0); // Adjust as needed
 
     useFrame(() => {
-        if (animationStep === "camera" && !completed) {
-            // Incliner la caméra progressivement vers targetRotation.x
+        if (!completed) {
+            // Smoothly interpolate the camera's position
+            camera.position.lerp(targetPosition, 0.02);
+            // Smoothly interpolate the camera's rotation
             camera.rotation.x = THREE.MathUtils.lerp(
                 camera.rotation.x,
-                targetRotation,
+                targetRotation.x,
                 0.02
             );
 
-            // Vérifier si l'animation est terminée
-            if (Math.abs(camera.rotation.x - targetRotation) < 0.001) {
-                console.log("Animation de la caméra terminée. Passage à l'étape 'disappear'.");
+            // Check if the camera has reached the target position and rotation
+            if (
+                camera.position.distanceTo(targetPosition) < 0.1 &&
+                Math.abs(camera.rotation.x - targetRotation.x) < 0.01
+            ) {
+                console.log("Camera animation completed. Transitioning to 'disappear' step.");
                 setAnimationStep("disappear");
                 setCompleted(true);
             }
@@ -342,43 +410,42 @@ const CameraController = ({ animationStep, targetRotation, setAnimationStep }) =
     return null;
 };
 
-// Composant principal Banner
+// Main Banner component
 export default function Banner() {
-    const cellSize = 1;
-    const svgUrl = "/WEB.svg"; // Assurez-vous que ce chemin est correct et que le fichier est accessible
+    const svgUrl = "/WEB.svg"; // Ensure this path is correct and accessible
 
-    // Vos lettres telles que vous les avez définies
+    // Define your letters
     const letters = [
-        // Lettre P
+        // Letter P
         [
-            [1, 1, 1, 1, 1], // Ligne 1
-            [1, 0, 0, 0, 1], // Ligne 2
-            [1, 1, 1, 1, 1], // Ligne 3
-            [1, 0, 0, 0, 0], // Ligne 4
-            [1, 0, 0, 0, 0], // Ligne 5
+            [1, 1, 1, 1, 1], // Row 1
+            [1, 0, 0, 0, 1], // Row 2
+            [1, 1, 1, 1, 1], // Row 3
+            [1, 0, 0, 0, 0], // Row 4
+            [1, 0, 0, 0, 0], // Row 5
         ],
-        // Lettre G
+        // Letter G
         [
-            [0, 1, 1, 1, 0], // Ligne 1
-            [1, 0, 0, 0, 0], // Ligne 2
-            [1, 0, 1, 1, 1], // Ligne 3
-            [1, 0, 0, 0, 1], // Ligne 4
-            [0, 1, 1, 1, 0], // Ligne 5
+            [0, 1, 1, 1, 0], // Row 1
+            [1, 0, 0, 0, 0], // Row 2
+            [1, 0, 1, 1, 1], // Row 3
+            [1, 0, 0, 0, 1], // Row 4
+            [0, 1, 1, 1, 0], // Row 5
         ],
-        // Lettre A
+        // Letter A
         [
-            [0, 1, 1, 1, 0], // Ligne 1
-            [1, 0, 0, 0, 1], // Ligne 2
-            [1, 1, 1, 1, 1], // Ligne 3
-            [1, 0, 0, 0, 1], // Ligne 4
-            [1, 0, 0, 0, 1], // Ligne 5
+            [0, 1, 1, 1, 0], // Row 1
+            [1, 0, 0, 0, 1], // Row 2
+            [1, 1, 1, 1, 1], // Row 3
+            [1, 0, 0, 0, 1], // Row 4
+            [1, 0, 0, 0, 1], // Row 5
         ],
     ];
 
-    // Générer les données de la grille en combinant les lettres
+    // Generate grid data by combining letters
     const { gridData, letterStartCols } = generateGridData(letters);
 
-    // Positions initiales des cubes à déplacer
+    // Initial cube positions
     const initialCubePositions = [
         [0, -6, 0.5],
         [2, -6, 0.5],
@@ -388,6 +455,7 @@ export default function Banner() {
         [6, -6, 0.5],
     ];
 
+    // State variables
     const [hoveredCell, setHoveredCell] = useState(null);
     const [filledLetters, setFilledLetters] = useState(
         new Array(letters.length).fill(false)
@@ -398,29 +466,29 @@ export default function Banner() {
     const [newCubes, setNewCubes] = useState([]);
     const [cubePositions, setCubePositions] = useState(initialCubePositions);
 
-    const [animationStep, setAnimationStep] = useState("filling"); // Étapes: 'filling', 'camera', 'disappear', 'logo'
+    const [animationStep, setAnimationStep] = useState("filling"); // Steps: 'filling', 'camera', 'disappear', 'logo'
 
     const planeRef = useRef();
 
-    // Vérifier si toutes les lettres sont remplies
+    // Check if all letters are filled to transition to 'camera' step
     useEffect(() => {
         if (filledLetters.every(Boolean) && animationStep === "filling") {
-            console.log("Toutes les lettres sont remplies. Passage à l'étape 'camera'.");
+            console.log("All letters filled. Transitioning to 'camera' step.");
             setAnimationStep("camera");
         }
     }, [filledLetters, animationStep]);
 
-    // Gestion de l'étape 'disappear'
+    // Handle 'disappear' animation step
     useEffect(() => {
         if (animationStep === "disappear") {
-            console.log("Début de l'animation de disparition des cubes et des cases.");
+            console.log("Starting disappearance animation.");
 
-            // Définir une durée appropriée pour l'animation de disparition
-            const disappearanceDuration = 2000; // 2 secondes
+            // Define duration for disappearance
+            const disappearanceDuration = 1000; // 2 seconds
 
-            // Utiliser un timeout pour passer à l'étape 'logo' après la durée de disparition
+            // Transition to 'logo' step after disappearance duration
             const timeout = setTimeout(() => {
-                console.log("Animation de disparition terminée. Passage à l'étape 'logo'.");
+                console.log("Disappearance animation completed. Transitioning to 'logo' step.");
                 setAnimationStep("logo");
             }, disappearanceDuration);
 
@@ -428,11 +496,11 @@ export default function Banner() {
         }
     }, [animationStep]);
 
-    // Gestion du dépôt d'un cube sur la grille
+    // Handle cube drop on the grid
     const handleCubeDrop = (position, cubeIndex) => {
-        if (animationStep !== "filling") return; // Empêcher le dépôt pendant d'autres animations
+        if (animationStep !== "filling") return; // Prevent dropping during other animations
 
-        // Détecter la lettre correspondante en fonction de la position X
+        // Determine which letter the cube was dropped on based on X position
         let letterIndex = -1;
         let cumulativeOffset = 0;
 
@@ -444,17 +512,17 @@ export default function Banner() {
                 letterIndex = i;
                 break;
             }
-            cumulativeOffset += letterWidth + 1; // Ajouter un espace entre les lettres
+            cumulativeOffset += letterWidth + 1; // Add space between letters
         }
 
         if (letterIndex !== -1) {
-            // Vérifier si le cube est parmi les cubes initiaux
+            // Check if the cube is among the initial cubes
             if (cubeIndex < initialCubePositions.length) {
                 const updatedLetterCubeIndices = [...letterCubeIndices];
                 updatedLetterCubeIndices[letterIndex].add(cubeIndex);
                 setLetterCubeIndices(updatedLetterCubeIndices);
 
-                // Si au moins deux cubes sont placés sur la lettre
+                // If at least two cubes are placed on the letter, fill the letter
                 if (
                     updatedLetterCubeIndices[letterIndex].size >= 2 &&
                     !filledLetters[letterIndex]
@@ -465,7 +533,7 @@ export default function Banner() {
         }
     };
 
-    // Fonction pour remplir la lettre avec les cubes qui tombent
+    // Function to fill the letter with falling cubes
     const fillLetter = (letterIndex) => {
         const baseX =
             letterStartCols[letterIndex] - Math.floor(gridData[0].length / 2);
@@ -477,27 +545,27 @@ export default function Banner() {
             baseY
         );
 
-        // Trier les positions pour l'effet de chute
+        // Sort positions for falling effect
         allPositions.sort((a, b) => b[1] - a[1]);
 
-        // Ajouter les cubes avec un délai
+        // Add cubes with a delay for staggered effect
         allPositions.forEach((pos, idx) => {
             setTimeout(() => {
                 setNewCubes((prev) => [...prev, pos]);
-            }, idx * 50); // Délai de 50ms entre chaque cube
+            }, idx * 50); // 50ms delay between each cube
         });
 
-        // Mettre à jour l'état des lettres remplies
+        // Update filled letters state
         const updatedFilledLetters = [...filledLetters];
         updatedFilledLetters[letterIndex] = true;
         setFilledLetters(updatedFilledLetters);
 
-        // Réinitialiser les cubes placés sur la lettre
+        // Reset cubes placed on the letter
         const updatedLetterCubeIndices = [...letterCubeIndices];
         updatedLetterCubeIndices[letterIndex] = new Set();
         setLetterCubeIndices(updatedLetterCubeIndices);
 
-        // Réinitialiser les positions des cubes utilisés
+        // Reset positions of used cubes to initial positions
         const updatedCubePositions = [...cubePositions];
         updatedLetterCubeIndices[letterIndex].forEach((idx) => {
             updatedCubePositions[idx] = initialCubePositions[idx];
@@ -508,17 +576,11 @@ export default function Banner() {
     return (
         <div className={styles.banner}>
             <Canvas
-                camera={{ position: [0, -5, 15], fov: 50 }} // Inclinaison initiale vers l'arrière
+                camera={{ position: [0, -5, 15], fov: 50 }} // Initial camera position
                 shadows
                 color={"#FFFFFF"}
             >
-                {/* Animation de la caméra */}
-                <CameraController
-                    animationStep={animationStep}
-                    targetRotation={0.18}
-                    setAnimationStep={setAnimationStep}
-                />
-
+                {/* Ambient and Directional Lights */}
                 <ambientLight intensity={2} />
                 <directionalLight
                     position={[10, 20, 10]}
@@ -528,58 +590,81 @@ export default function Banner() {
                     shadow-mapSize-height={1024}
                 />
 
-                <Grid
-                    gridData={gridData}
-                    hoveredCell={hoveredCell}
-                    setHoveredCell={setHoveredCell}
-                    onCellClick={handleCubeDrop}
-                    animationStep={animationStep}
-                />
+                {/* Render CameraController only during 'camera' step */}
+                {animationStep === "camera" && (
+                    <CameraController
+                        setAnimationStep={setAnimationStep}
+                    />
+                )}
 
+                {/* Render Grid, newCubes, and DraggableCubes during 'filling', 'camera', and 'disappear' steps */}
+                {(animationStep === "filling" ||
+                    animationStep === "camera" ||
+                    animationStep === "disappear") && (
+                    <>
+                        <Grid
+                            gridData={gridData}
+                            hoveredCell={hoveredCell}
+                            setHoveredCell={setHoveredCell}
+                            onCellClick={handleCubeDrop}
+                            animationStep={animationStep}
+                        />
+                        {newCubes.map((position, index) => (
+                            <mesh
+                                key={`new-cube-${index}`}
+                                position={position}
+                                castShadow
+                                visible={animationStep !== "logo"} // Hide during 'logo' step
+                            >
+                                <boxGeometry args={[1, 1, 1]} />
+                                <meshStandardMaterial
+                                    color="#0400ff"
+                                    opacity={0.7}
+                                    transparent={true}
+                                    roughness={0.7}
+                                    metalness={0.5}
+                                    envMapIntensity={10}
+                                />
+                            </mesh>
+                        ))}
+                        {cubePositions.map((position, index) => (
+                            <DraggableCube
+                                key={`cube-${index}`}
+                                position={position}
+                                cubeIndex={index}
+                                onDrop={handleCubeDrop}
+                                planeRef={planeRef}
+                                animationStep={animationStep}
+                            />
+                        ))}
+                    </>
+                )}
+
+                {/* Invisible plane for dragging */}
                 <mesh
                     ref={planeRef}
                     position={[0, 0, 0]}
                     rotation={[0, 0, 0]}
-                    visible={false} // Rendre le plan invisible
+                    visible={false} // Make the plane invisible
                 >
                     <planeGeometry args={[100, 100]} />
                     <meshBasicMaterial transparent opacity={0} />
                 </mesh>
 
-                {/* Affichage des nouveaux cubes qui remplissent les lettres */}
-                {newCubes.map((position, index) => (
-                    <mesh
-                        key={`new-cube-${index}`}
-                        position={position}
-                        castShadow
-                        visible={animationStep !== "disappear"}
-                    >
-                        <boxGeometry args={[1, 1, 1]} />
-                        <meshStandardMaterial
-                            color="#0400ff"
-                            opacity={0.7}
-                            transparent={true}
-                            roughness={0.7}
-                            metalness={0.5}
-                            envMapIntensity={10}
+                {/* Render LogoDisplay only during 'logo' step */}
+                {animationStep === "logo" && (
+                    <>
+
+                        <LogoDisplay
+                            svgUrl={svgUrl}
+                            animationStep={animationStep}
+                            rotation={[Math.PI, 0, 0]}
+                            // Rotation of 180 degrees on the X-axis
                         />
-                    </mesh>
-                ))}
+                        <OrbitControls/>
+                    </>
 
-                {/* Affichage des cubes à déplacer */}
-                {cubePositions.map((position, index) => (
-                    <DraggableCube
-                        key={`cube-${index}`}
-                        position={position}
-                        cubeIndex={index}
-                        onDrop={handleCubeDrop}
-                        planeRef={planeRef}
-                        animationStep={animationStep}
-                    />
-                ))}
-
-                {/* Affichage du logo avec animation stylée */}
-                <LogoDisplay svgUrl={svgUrl} animationStep={animationStep} />
+                )}
             </Canvas>
         </div>
     );
