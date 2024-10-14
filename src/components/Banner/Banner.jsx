@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, useCursor } from "@react-three/drei";
+import { useCursor } from "@react-three/drei";
 import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader";
 import styles from "./banner.module.scss";
@@ -500,6 +500,9 @@ const LogoMeshes = ({ svgUrl, groupRef, setMeshesLoaded }) => {
                         // Ajoutez plus de couleurs si nécessaire
                     ];
 
+                    // Créer un groupe temporaire pour contenir tous les maillages
+                    const tempGroup = new THREE.Group();
+
                     paths.forEach((path, pathIndex) => {
                         // Assigner une couleur basée sur l'index du chemin
                         const color = colors[pathIndex % colors.length];
@@ -525,15 +528,35 @@ const LogoMeshes = ({ svgUrl, groupRef, setMeshesLoaded }) => {
                                 steps: 1,
                             });
                             const mesh = new THREE.Mesh(geometry, material);
-                            groupRef.current.add(mesh);
-                            console.log(`Mesh added: Path ${pathIndex}, Shape ${shapeIndex} with color ${color}`);
+                            mesh.scale.y *= -1;
+
+                            tempGroup.add(mesh);
+                            console.log(
+                                `Mesh added: Path ${pathIndex}, Shape ${shapeIndex} with color ${color}`
+                            );
                         });
                     });
+
+                    // Calculer la boîte englobante du groupe temporaire
+                    const box = new THREE.Box3().setFromObject(tempGroup);
+                    const center = box.getCenter(new THREE.Vector3());
+
+                    // Recentrer les maillages en soustrayant le centre
+                    tempGroup.children.forEach((child) => {
+                        child.position.x -= center.x;
+                        child.position.y -= center.y;
+                        child.position.z -= center.z;
+                    });
+
+                    // Ajouter les maillages recentrés au groupe principal
+                    groupRef.current.add(...tempGroup.children);
 
                     setMeshesLoaded(true);
                 },
                 (xhr) => {
-                    console.log(`Loading SVG: ${Math.round((xhr.loaded / xhr.total) * 100)}% completed.`);
+                    console.log(
+                        `Loading SVG: ${Math.round((xhr.loaded / xhr.total) * 100)}% completed.`
+                    );
                 },
                 (error) => {
                     console.error("Error loading SVG:", error);
@@ -550,7 +573,7 @@ const LogoMeshes = ({ svgUrl, groupRef, setMeshesLoaded }) => {
 // -----------------------------
 
 // Affiche le logo avec des effets de post-traitement
-const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
+const LogoDisplay = ({ svgUrl, animationStep, rotation, mousePosition }) => {
     const groupRef = useRef();
     const [meshesLoaded, setMeshesLoaded] = useState(false);
     const [scale, setScale] = useState(0.01); // Commence avec une petite échelle
@@ -564,10 +587,31 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
     // Graduellement augmenter l'échelle du logo pendant l'étape 'logo'
     useFrame(() => {
         if (animationStep === "logo" && meshesLoaded && groupRef.current) {
-            const targetScale = 0.04; // Ajustez l'échelle cible selon vos besoins
+            const targetScale = 0.04;
             const newScale = THREE.MathUtils.lerp(scale, targetScale, 0.09);
             setScale(newScale);
             groupRef.current.scale.set(newScale, newScale, newScale);
+
+            // Ajouter l'effet d'inclinaison en fonction de la position de la souris
+            const tiltX = -mousePosition.y * 0.3; // Inverser le signe pour l'axe X
+            const tiltY = mousePosition.x * 0.3;
+
+            // Limiter l'inclinaison pour éviter une rotation excessive
+            const maxTilt = 0.5; // En radians (~28 degrés)
+            const clampedTiltX = THREE.MathUtils.clamp(tiltX, -maxTilt, maxTilt);
+            const clampedTiltY = THREE.MathUtils.clamp(tiltY, -maxTilt, maxTilt);
+
+            // Appliquer une interpolation pour lisser les mouvements
+            groupRef.current.rotation.x = THREE.MathUtils.lerp(
+                groupRef.current.rotation.x,
+                rotation[0] + clampedTiltX,
+                0.1
+            );
+            groupRef.current.rotation.y = THREE.MathUtils.lerp(
+                groupRef.current.rotation.y,
+                rotation[1] + clampedTiltY,
+                0.1
+            );
         }
     });
 
@@ -575,11 +619,10 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
         <>
             <group
                 ref={groupRef}
-                position={[-10, 8, 3]}
-                rotation={rotation} // Appliquer la rotation
+                position={[0, 0, 0]} // Centrer le logo
+                rotation={[Math.PI, 0, 0]} // Rotation de 180 degrés sur l'axe X
                 visible={animationStep === "logo"}
             >
-                {/* Ajouter les maillages SVG au groupe */}
                 {animationStep === "logo" && (
                     <LogoMeshes
                         svgUrl={svgUrl}
@@ -589,19 +632,17 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
                 )}
             </group>
 
-            {/* Appliquer les effets de post-traitement */}
             {animationStep === "logo" && (
                 <EffectComposer>
-                    {/* Effet Bloom */}
+                    {/* Vos effets de post-traitement */}
                     <Bloom
-                        luminanceThreshold={0.1} // Ajustez le seuil pour les parties lumineuses
+                        luminanceThreshold={0.1}
                         luminanceSmoothing={0.9}
-                        intensity={1.5} // Intensité de l'effet Bloom
+                        intensity={1.5}
                     />
-                    {/* Effet Outline pour le glow */}
                     <Outline
                         blur
-                        edgeStrength={3} // Ajustez pour un glow plus fort
+                        edgeStrength={3}
                         pulseSpeed={0.6}
                         visibleEdgeColor="#ffffff"
                         hiddenEdgeColor="#000000"
@@ -622,25 +663,15 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
 const CameraController = ({ setAnimationStep }) => {
     const { camera } = useThree();
     const [completed, setCompleted] = useState(false);
-    const targetPosition = new THREE.Vector3(0, -5, 15);
-    const targetRotation = new THREE.Euler(0.18, 0, 0); // Ajustez selon vos besoins
+
+    const targetPosition = new THREE.Vector3(0, 0, 15);
 
     useFrame(() => {
         if (!completed) {
-            // Interpoler doucement la position de la caméra
             camera.position.lerp(targetPosition, 0.02);
-            // Interpoler doucement la rotation de la caméra
-            camera.rotation.x = THREE.MathUtils.lerp(
-                camera.rotation.x,
-                targetRotation.x,
-                0.02
-            );
+            camera.lookAt(0, 0, 0);
 
-            // Vérifier si la caméra a atteint la position et rotation cible
-            if (
-                camera.position.distanceTo(targetPosition) < 0.1 &&
-                Math.abs(camera.rotation.x - targetRotation.x) < 0.01
-            ) {
+            if (camera.position.distanceTo(targetPosition) < 0.1) {
                 setAnimationStep("disappear");
                 setCompleted(true);
             }
@@ -710,7 +741,7 @@ export default function Banner() {
         new Array(letters.length).fill().map(() => new Set())
     );
     const [newCubes, setNewCubes] = useState([]); // Cubes formant les lettres
-    const [cubePositions, setCubePositions] = useState(initialCubePositions);
+    const [cubePositions] = useState(initialCubePositions);
 
     const [animationStep, setAnimationStep] = useState("filling"); // Étapes: 'filling', 'camera', 'disappear', 'logo'
     const [explodedCubes, setExplodedCubes] = useState(new Set());
@@ -724,6 +755,24 @@ export default function Banner() {
     const totalCellsToExplodeRef = useRef(0);
 
     const planeRef = useRef();
+    const canvasRef = useRef(); // Ref pour le Canvas
+    const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // Position de la souris
+
+    // Fonction pour mettre à jour la position de la souris
+    const handleMouseMove = (event) => {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1; // De -1 (gauche) à 1 (droite)
+        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1; // De -1 (bas) à 1 (haut)
+        setMousePosition({ x, y });
+    };
+    useEffect(() => {
+        if (animationStep === "logo" && canvasRef.current) {
+            canvasRef.current.addEventListener("mousemove", handleMouseMove);
+            return () => {
+                canvasRef.current.removeEventListener("mousemove", handleMouseMove);
+            };
+        }
+    }, [animationStep]);
 
     // Fonction pour remplir la lettre avec des cubes
     const fillLetter = useCallback(
@@ -888,9 +937,13 @@ export default function Banner() {
     return (
         <div className={styles.banner}>
             <Canvas
-                camera={{ position: [0, -5, 15], fov: 50 }} // Position initiale de la caméra
+                ref={canvasRef}
+                camera={{ position: [0, -8, 15], fov: 50 }}
                 shadows
                 color={"#FFFFFF"}
+                onCreated={({ camera }) => {
+                    camera.lookAt(0, 0, 0); // Regarder vers l'origine
+                }}
             >
                 {/* Lumières ambiantes et directionnelles */}
                 <ambientLight intensity={2} />
@@ -988,9 +1041,10 @@ export default function Banner() {
                         <LogoDisplay
                             svgUrl={svgUrl}
                             animationStep={animationStep}
-                            rotation={[Math.PI, 0, 0]} // Rotation de 180 degrés sur l'axe X
+                            rotation={[0, 0, 0]} // Pas de rotation initiale
+                            mousePosition={mousePosition}
                         />
-                        <OrbitControls />
+                        {/* <OrbitControls /> */}
                     </>
                 )}
             </Canvas>
