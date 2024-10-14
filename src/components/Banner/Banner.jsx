@@ -6,16 +6,10 @@ import { OrbitControls, useCursor } from "@react-three/drei";
 import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader";
 import styles from "./banner.module.scss";
-import {
-    EffectComposer,
-    Outline,
-    Bloom,
-    DepthOfField,
-    Glitch,
-} from "@react-three/postprocessing"; // Import post-processing
+import { EffectComposer, Outline, Bloom } from "@react-three/postprocessing";
 
 // -----------------------------
-// **Utility Functions**
+// **Fonctions Utilitaires**
 // -----------------------------
 
 // Fonction pour obtenir les positions des cubes à partir d'une grille de lettre
@@ -243,7 +237,6 @@ const ExplodingCube = ({ position, cubeIndex, onExplosionComplete }) => {
     const [rotationSpeed, setRotationSpeed] = useState(new THREE.Vector3());
 
     useEffect(() => {
-        console.log(`ExplodingCube ${cubeIndex} mounted.`);
         // Démarrer l'explosion dès que le composant est monté
         setIsExploding(true);
 
@@ -266,11 +259,10 @@ const ExplodingCube = ({ position, cubeIndex, onExplosionComplete }) => {
         setRotationSpeed(randomRotation);
 
         // Durée de l'animation d'explosion
-        const explosionDuration = 1000; // 2 secondes
+        const explosionDuration = 1000; // 1 seconde
 
         // Notifier la fin de l'explosion après la durée spécifiée
         const timeout = setTimeout(() => {
-            console.log(`Explosion du cube ${cubeIndex} terminée.`);
             onExplosionComplete(cubeIndex);
         }, explosionDuration);
 
@@ -339,7 +331,6 @@ const ExplodingCell = ({ position, cellIndex, onExplosionComplete }) => {
     const [rotationSpeed, setRotationSpeed] = useState(new THREE.Vector3());
 
     useEffect(() => {
-        console.log(`ExplodingCell ${cellIndex} mounted.`);
         // Démarrer l'explosion dès que le composant est monté
         setIsExploding(true);
 
@@ -362,11 +353,10 @@ const ExplodingCell = ({ position, cellIndex, onExplosionComplete }) => {
         setRotationSpeed(randomRotation);
 
         // Durée de l'animation d'explosion
-        const explosionDuration = 1000; // 2 secondes
+        const explosionDuration = 1000; // 1 seconde
 
         // Notifier la fin de l'explosion après la durée spécifiée
         const timeout = setTimeout(() => {
-            console.log(`Explosion de la cellule ${cellIndex} terminée.`);
             onExplosionComplete(cellIndex);
         }, explosionDuration);
 
@@ -618,14 +608,6 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation }) => {
                         width={1024}
                         height={1024}
                     />
-                    {/* Effet Depth of Field (Flou) */}
-
-                    {/* Effet Glitch (optionnel) */}
-                    {/* <Glitch
-                        delay={[2.5, 5.5]} // Temps entre les glitchs
-                        duration={[0.3, 1.0]} // Durée de chaque glitch
-                        strength={[0.1, 0.3]} // Intensité de l'effet glitch
-                    /> */}
                 </EffectComposer>
             )}
         </>
@@ -659,7 +641,6 @@ const CameraController = ({ setAnimationStep }) => {
                 camera.position.distanceTo(targetPosition) < 0.1 &&
                 Math.abs(camera.rotation.x - targetRotation.x) < 0.01
             ) {
-                console.log("Camera animation completed. Transitioning to 'disappear' step.");
                 setAnimationStep("disappear");
                 setCompleted(true);
             }
@@ -705,7 +686,10 @@ export default function Banner() {
     ];
 
     // Mémoïser les données de la grille pour éviter les re-rendus inutiles
-    const { gridData, letterStartCols } = useMemo(() => generateGridData(letters), [letters]);
+    const { gridData, letterStartCols } = useMemo(
+        () => generateGridData(letters),
+        [letters]
+    );
 
     // Positions initiales des cubes que les utilisateurs peuvent déplacer
     const initialCubePositions = [
@@ -719,8 +703,10 @@ export default function Banner() {
 
     // Variables d'état
     const [hoveredCell, setHoveredCell] = useState(null);
-    const [filledLetters, setFilledLetters] = useState(new Array(letters.length).fill(false));
-    const [letterCubeIndices, setLetterCubeIndices] = useState(
+    const [filledLetters, setFilledLetters] = useState(
+        new Array(letters.length).fill(false)
+    );
+    const [letterCubePositions, setLetterCubePositions] = useState(
         new Array(letters.length).fill().map(() => new Set())
     );
     const [newCubes, setNewCubes] = useState([]); // Cubes formant les lettres
@@ -739,21 +725,127 @@ export default function Banner() {
 
     const planeRef = useRef();
 
+    // Fonction pour remplir la lettre avec des cubes
+    const fillLetter = useCallback(
+        (letterIndex) => {
+            const baseX =
+                letterStartCols[letterIndex] - Math.floor(gridData[0].length / 2);
+            const baseY = Math.floor(gridData.length / 2);
+
+            const allPositions = getLetterPositions(
+                letters[letterIndex],
+                baseX,
+                baseY
+            );
+
+            // Trier les positions pour un effet de chute
+            allPositions.sort((a, b) => b[1] - a[1]);
+
+            // Ajouter des cubes avec un délai pour un effet d'échelonnement
+            allPositions.forEach((pos, idx) => {
+                setTimeout(() => {
+                    // Empêcher l'ajout de nouveaux cubes si l'étape n'est pas 'filling'
+                    if (animationStep === "filling") {
+                        setNewCubes((prev) => [...prev, pos]);
+                    }
+                }, idx * 50); // Délai de 50ms entre chaque cube
+            });
+
+            // Mettre à jour l'état des lettres remplies
+            const updatedFilledLetters = [...filledLetters];
+            updatedFilledLetters[letterIndex] = true;
+            setFilledLetters(updatedFilledLetters);
+
+            // Réinitialiser les positions des cubes utilisés pour cette lettre
+            const updatedLetterCubePositions = [...letterCubePositions];
+            updatedLetterCubePositions[letterIndex] = new Set();
+            setLetterCubePositions(updatedLetterCubePositions);
+        },
+        [
+            animationStep,
+            filledLetters,
+            gridData.length,
+            gridData[0].length,
+            letterStartCols,
+            letters,
+            setNewCubes,
+            setFilledLetters,
+            letterCubePositions,
+            setLetterCubePositions,
+        ]
+    );
+
+    // Gérer le dépôt d'un cube sur la grille
+    const handleCubeDrop = useCallback(
+        (position, cubeIndex) => {
+            if (animationStep !== "filling") return; // Empêcher le dépôt pendant les autres animations
+
+            // Calculer colIndex et rowIndex à partir de position.x et position.y
+            const colIndex = Math.round(position.x + Math.floor(gridData[0].length / 2));
+            const rowIndex = Math.round(Math.floor(gridData.length / 2) - position.y);
+
+            // Vérifier si les indices sont valides
+            if (
+                rowIndex >= 0 &&
+                rowIndex < gridData.length &&
+                colIndex >= 0 &&
+                colIndex < gridData[0].length
+            ) {
+                // Vérifier si la cellule est un '1' dans gridData
+                if (gridData[rowIndex][colIndex] === 1) {
+                    // Déterminer quelle lettre le cube a été déposé en fonction de colIndex
+                    let letterIndex = -1;
+                    for (let i = 0; i < letterStartCols.length; i++) {
+                        const startCol = letterStartCols[i];
+                        const letterWidth = letters[i][0].length;
+                        const endCol = startCol + letterWidth;
+                        if (colIndex >= startCol && colIndex < endCol) {
+                            letterIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (letterIndex !== -1) {
+                        // Ajouter la position au Set de positions de cubes pour cette lettre
+                        const updatedLetterCubePositions = [...letterCubePositions];
+                        updatedLetterCubePositions[letterIndex].add(`${colIndex}-${rowIndex}`);
+                        setLetterCubePositions(updatedLetterCubePositions);
+
+                        // Vérifier si au moins deux positions '1' ont des cubes
+                        if (
+                            updatedLetterCubePositions[letterIndex].size >= 2 &&
+                            !filledLetters[letterIndex]
+                        ) {
+                            // Remplir la lettre
+                            fillLetter(letterIndex);
+                        }
+                    }
+                }
+            }
+        },
+        [
+            animationStep,
+            gridData,
+            letterStartCols,
+            letters,
+            letterCubePositions,
+            filledLetters,
+            fillLetter,
+        ]
+    );
+
     // Utiliser useCallback pour stabiliser les callbacks
     const handleExplosionCompleteCube = useCallback((cubeIndex) => {
-        console.log(`Explosion du cube ${cubeIndex} enregistrée.`);
         setExplodedCubes((prev) => new Set(prev).add(cubeIndex));
     }, []);
 
     const handleExplosionCompleteCell = useCallback((cellIndex) => {
-        console.log(`Explosion de la cellule ${cellIndex} enregistrée.`);
         setExplodedCells((prev) => new Set(prev).add(cellIndex));
     }, []);
 
     // Vérifier si toutes les lettres sont remplies pour passer à l'étape 'camera'
     useEffect(() => {
         if (filledLetters.every(Boolean) && animationStep === "filling") {
-            console.log("All letters filled. Transitioning to 'camera' step.");
             setAnimationStep("camera");
         }
     }, [filledLetters, animationStep]);
@@ -761,16 +853,12 @@ export default function Banner() {
     // Gérer l'étape 'disappear' une seule fois et capturer les totaux
     useEffect(() => {
         if (animationStep === "disappear" && !hasDisappeared) {
-            console.log("Starting disappearance animation.");
             setHasDisappeared(true); // Marquer que l'étape 'disappear' a été lancée
 
             // Capturer le total des cubes et des cellules à exploser
             totalCubesToExplodeRef.current = newCubes.length;
             const activeCells = gridData.flat().reduce((acc, cell) => acc + (cell === 1 ? 1 : 0), 0);
             totalCellsToExplodeRef.current = activeCells;
-
-            console.log(`Total cubes to explode: ${totalCubesToExplodeRef.current}`);
-            console.log(`Total cells to explode: ${totalCellsToExplodeRef.current}`);
 
             // Réinitialiser les trackers des explosions
             setExplodedCubes(new Set());
@@ -784,100 +872,14 @@ export default function Banner() {
             const totalCubesToExplode = totalCubesToExplodeRef.current;
             const totalCellsToExplode = totalCellsToExplodeRef.current;
 
-            console.log(
-                `Checking explosions: ${explodedCubes.size}/${totalCubesToExplode} cubes, ` +
-                `${explodedCells.size}/${totalCellsToExplode} cells.`
-            );
-
             if (
                 explodedCubes.size === totalCubesToExplode &&
                 explodedCells.size === totalCellsToExplode
             ) {
-                console.log("All cubes and cells have exploded. Transitioning to 'logo' step.");
                 setAnimationStep("logo");
             }
         }
     }, [explodedCubes, explodedCells, animationStep]);
-
-    // Gérer le dépôt d'un cube sur la grille
-    const handleCubeDrop = useCallback((position, cubeIndex) => {
-        if (animationStep !== "filling") return; // Empêcher le dépôt pendant les autres animations
-
-        // Déterminer quelle lettre le cube a été déposé en fonction de la position X
-        let letterIndex = -1;
-        let cumulativeOffset = 0;
-
-        for (let i = 0; i < letters.length; i++) {
-            const letterWidth = letters[i][0].length;
-            const startX = cumulativeOffset - Math.floor(gridData[0].length / 2);
-            const endX = startX + letterWidth;
-            if (position.x >= startX && position.x < endX) {
-                letterIndex = i;
-                break;
-            }
-            cumulativeOffset += letterWidth + 1; // Ajouter un espace entre les lettres
-        }
-
-        if (letterIndex !== -1) {
-            // Vérifier si le cube fait partie des cubes initiaux
-            if (cubeIndex < initialCubePositions.length) {
-                const updatedLetterCubeIndices = [...letterCubeIndices];
-                updatedLetterCubeIndices[letterIndex].add(cubeIndex);
-                setLetterCubeIndices(updatedLetterCubeIndices);
-
-                // Si au moins deux cubes sont placés sur la lettre, remplir la lettre
-                if (
-                    updatedLetterCubeIndices[letterIndex].size >= 2 &&
-                    !filledLetters[letterIndex]
-                ) {
-                    fillLetter(letterIndex);
-                }
-            }
-        }
-    }, [animationStep, letters, gridData, letterCubeIndices, filledLetters]);
-
-    // Fonction pour remplir la lettre avec des cubes
-    const fillLetter = useCallback((letterIndex) => {
-        const baseX =
-            letterStartCols[letterIndex] - Math.floor(gridData[0].length / 2);
-        const baseY = Math.floor(gridData.length / 2);
-
-        const allPositions = getLetterPositions(
-            letters[letterIndex],
-            baseX,
-            baseY
-        );
-
-        // Trier les positions pour un effet de chute
-        allPositions.sort((a, b) => b[1] - a[1]);
-
-        // Ajouter des cubes avec un délai pour un effet d'échelonnement
-        allPositions.forEach((pos, idx) => {
-            setTimeout(() => {
-                // Empêcher l'ajout de nouveaux cubes si l'étape n'est pas 'filling'
-                if (animationStep === "filling") {
-                    setNewCubes((prev) => [...prev, pos]);
-                }
-            }, idx * 50); // Délai de 50ms entre chaque cube
-        });
-
-        // Mettre à jour l'état des lettres remplies
-        const updatedFilledLetters = [...filledLetters];
-        updatedFilledLetters[letterIndex] = true;
-        setFilledLetters(updatedFilledLetters);
-
-        // Réinitialiser les indices des cubes placés sur la lettre
-        const updatedLetterCubeIndices = [...letterCubeIndices];
-        updatedLetterCubeIndices[letterIndex] = new Set();
-        setLetterCubeIndices(updatedLetterCubeIndices);
-
-        // Réinitialiser les positions des cubes utilisés aux positions initiales
-        const updatedCubePositions = [...cubePositions];
-        updatedLetterCubeIndices[letterIndex].forEach((idx) => {
-            updatedCubePositions[idx] = initialCubePositions[idx];
-        });
-        setCubePositions(updatedCubePositions);
-    }, [animationStep, filledLetters, gridData.length, gridData[0].length, letterStartCols, letterCubeIndices, letters, initialCubePositions, setNewCubes, setFilledLetters, setLetterCubeIndices, setCubePositions]);
 
     // -----------------------------
     // **Main Banner JSX**
@@ -893,7 +895,7 @@ export default function Banner() {
                 {/* Lumières ambiantes et directionnelles */}
                 <ambientLight intensity={2} />
                 <directionalLight
-                    position={[10, 20, 10]}
+                    position={[5, 5, 10]}
                     intensity={1.5}
                     castShadow
                     shadow-mapSize-width={1024}
@@ -992,6 +994,6 @@ export default function Banner() {
                     </>
                 )}
             </Canvas>
-        </div>)
+        </div>
+    );
 }
-
