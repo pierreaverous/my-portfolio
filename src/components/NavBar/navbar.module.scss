@@ -1,0 +1,60 @@
+.ContainerNavBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.NavBarContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.NavBarItem {
+  margin: 0 20px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  font-weight: 700;
+  text-transform: uppercase;
+
+  /* De base, invisible. Son opacité pourra être contrôlée en JS : style={{ opacity: 1 }} */
+  opacity: 0;
+
+  /* --- Dégradé bleu/noir + animation --- */
+  background: linear-gradient(
+                  90deg,
+                  #0139ff,
+                  #1d1d1b,
+                  #0139ff,
+                  #1d1d1b
+  );
+  background-size: 400% 400%;
+  background-clip: text;
+  -webkit-background-clip: text; /* Pour Safari / anciens Chrome */
+  color: transparent;
+
+  /* Animation du dégradé en continu (3s, easing “ease”, bouclée) */
+  animation: gradientShift 3s ease infinite;
+
+  /* Transition pour opacité et transform */
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+/* Animation keyframes : fait défiler le background-position du gradient */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}

@@ -669,10 +669,10 @@ const CameraController = ({ setAnimationStep }) => {
     useFrame(() => {
         if (!completed) {
             camera.position.lerp(targetPosition, 0.02);
-            camera.lookAt(0, 0, 0);
+            camera.lookAt(0, -3.5, 0);
 
-            if (camera.position.distanceTo(targetPosition) < 0.1) {
-                setAnimationStep("disappear");
+            if (camera.position.distanceTo(targetPosition) < 1) {
+                setAnimationStep("disappear"); // Passe immédiatement à l'étape "disappear"
                 setCompleted(true);
             }
         }
@@ -942,7 +942,7 @@ export default function Banner() {
                 shadows
                 color={"#FFFFFF"}
                 onCreated={({ camera }) => {
-                    camera.lookAt(0, 0, 0); // Regarder vers l'origine
+                    camera.lookAt(0, -3.5, 0); // Regarder vers l'origine
                 }}
             >
                 {/* Lumières ambiantes et directionnelles */}
