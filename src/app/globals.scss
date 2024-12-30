@@ -12,3 +12,12 @@ body {
 
 
 
+.scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Masquer les barres de défilement pour Firefox */
+.scroll-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none; /* IE and Edge */
+}

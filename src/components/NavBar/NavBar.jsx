@@ -6,6 +6,7 @@ import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader";
 import styles from "./navbar.module.scss";
+import {OrbitControls} from "@react-three/drei";
 
 /*
   ─────────────────────────────────────────────────────────────────
@@ -227,14 +228,14 @@ const MovingStar = ({ starUrl, onReveal }) => {
     const [particles, setParticles] = useState([]);
 
     // Vitesse de déplacement
-    const speed = 2;
+    const speed = 3;
 
     // Positions X pour révéler les textes
     const textPositions = useMemo(
         () => ({
             accueil: 0,
             project: 0,
-            contact: 2,
+            contact: 1,
         }),
         []
     );
@@ -355,7 +356,12 @@ export default function NavBar() {
             >
                 <ambientLight intensity={0.6} />
                 <pointLight position={[10, 10, 10]} />
-
+                <OrbitControls
+                    enableZoom={true}
+                    maxDistance={10}
+                    minDistance={3}
+                    enablePan={false}
+                />
                 {/* Étoile filante */}
                 <MovingStar starUrl="/logo.svg" onReveal={handleReveal} />
 
@@ -363,6 +369,7 @@ export default function NavBar() {
                 <EffectComposer>
                     <Bloom luminanceThreshold={0} luminanceSmoothing={0.9} height={300} />
                 </EffectComposer>
+
             </Canvas>
 
             {/* Textes */}
@@ -371,7 +378,7 @@ export default function NavBar() {
                     className={styles.NavBarItem}
                     style={{
                         opacity: revealState.accueil ? 1 : 0,
-                        transform: revealState.accueil ? "scale(1)" : "scale(0.8)",
+                        transform: revealState.accueil ? "scale(1.2)" : "scale(0.8)",
                     }}
                 >
                     Accueil
@@ -380,7 +387,7 @@ export default function NavBar() {
                     className={styles.NavBarItem}
                     style={{
                         opacity: revealState.project ? 1 : 0,
-                        transform: revealState.project ? "scale(1)" : "scale(0.8)",
+                        transform: revealState.project ? "scale(1.2)" : "scale(0.8)",
                     }}
                 >
                     Project
@@ -389,11 +396,12 @@ export default function NavBar() {
                     className={styles.NavBarItem}
                     style={{
                         opacity: revealState.contact ? 1 : 0,
-                        transform: revealState.contact ? "scale(1)" : "scale(0.8)",
+                        transform: revealState.contact ? "scale(1.2)" : "scale(0.8)",
                     }}
                 >
                     Contact
                 </p>
+
             </div>
         </div>
     );

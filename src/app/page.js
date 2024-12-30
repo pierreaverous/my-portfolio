@@ -2,6 +2,7 @@
 import styles from './home.module.scss';
 import Banner from '../components/Banner/Banner';
 import NavBar from '../components/NavBar/NavBar';
+import CarrouselProject from "../components/CarousselProject/CarrouselProject";
 
 export default function Home() {
     return (
@@ -10,6 +11,9 @@ export default function Home() {
             <main>
                 <Banner/>
             </main>
+            <div style={{width: "100vw", height: "100vh"}}>
+                <CarrouselProject/>
+            </div>
 
         </>
 
