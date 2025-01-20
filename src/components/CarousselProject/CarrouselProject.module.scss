@@ -1,57 +1,75 @@
+/* CarrouselProject.module.scss */
+
 .Container {
   display: flex;
+  position: relative;
   width: 100%;
   height: 100vh;
+  overflow-x: hidden;
 }
 
 .LeftSide {
   width: 60%;
-  height: 100%;
-  overflow: hidden;
+  position: relative;
 }
 
 .CanvasWrapper {
   width: 100%;
   height: 100%;
-  position: relative;
-  overflow: hidden;
-
-  canvas {
-    opacity: 0;
-    animation: fadeIn 1.5s forwards;
-  }
 }
 
 .RightSide {
   width: 40%;
-  height: 100%;
+  padding: 20px;
+  color: #fff;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-
-  h1 {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-  }
-  p {
-    font-size: 1rem;
-    line-height: 1.4;
-  }
 }
 
-@keyframes fadeIn {
-  to {
-    opacity: 1;
-  }
-}
-/* Masquer les barres de défilement pour Webkit (Chrome, Safari) */
-.scroll-container::-webkit-scrollbar {
-  display: none;
+.RightSide h1 {
+  margin-bottom: 10px;
+  font-size: 2em;
 }
 
-/* Masquer les barres de défilement pour Firefox */
-.scroll-container {
-  scrollbar-width: none;
+.RightSide p {
+  font-size: 1.2em;
 }
 
+/* Styles pour la barre de défilement personnalisée */
+.Scrollbar {
+  position: absolute;
+  bottom: 20px; /* Positionnez la barre juste en dessous du Canvas */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%; /* Largeur de la barre */
+  height: 8px; /* Épaisseur de la barre */
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  z-index: 10;
+  overflow: hidden;
+  cursor: pointer; /* Indique que la barre est interactive */
+}
+
+.Thumb {
+  width: 20%; /* Largeur du pouce en pourcentage de la barre */
+  height: 100%;
+  background: #fff;
+  border-radius: 4px;
+  transition: transform 0.3s ease, background-color 0.3s ease;
+  transform: translateX(0%);
+}
+
+.Thumb:hover {
+  background: #ddd;
+}
+
+.Thumb:active {
+  background: #bbb;
+}
+.Card{
+  object-fit: cover;
+
+}

@@ -619,7 +619,7 @@ const LogoDisplay = ({ svgUrl, animationStep, rotation, mousePosition }) => {
         <>
             <group
                 ref={groupRef}
-                position={[0, 0, 0]} // Centrer le logo
+                position={[0, -2, 0]} // Centrer le logo
                 rotation={[Math.PI, 0, 0]} // Rotation de 180 degrés sur l'axe X
                 visible={animationStep === "logo"}
             >
@@ -669,7 +669,7 @@ const CameraController = ({ setAnimationStep }) => {
     useFrame(() => {
         if (!completed) {
             camera.position.lerp(targetPosition, 0.02);
-            camera.lookAt(0, -3.5, 0);
+            camera.lookAt(0, -2, 0);
 
             if (camera.position.distanceTo(targetPosition) < 1) {
                 setAnimationStep("disappear"); // Passe immédiatement à l'étape "disappear"
@@ -938,11 +938,11 @@ export default function Banner() {
         <div className={styles.banner}>
             <Canvas
                 ref={canvasRef}
-                camera={{ position: [0, -8, 15], fov: 50 }}
+                camera={{ position: [0, -8, 15], fov: 40 }}
                 shadows
                 color={"#FFFFFF"}
                 onCreated={({ camera }) => {
-                    camera.lookAt(0, -3.5, 0); // Regarder vers l'origine
+                    camera.lookAt(0, -1.7, 0); // Regarder vers l'origine
                 }}
             >
                 {/* Lumières ambiantes et directionnelles */}

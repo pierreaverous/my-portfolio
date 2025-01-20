@@ -11,7 +11,7 @@ export default function Home() {
             <main>
                 <Banner/>
             </main>
-            <div style={{width: "100vw", height: "100vh"}}>
+            <div style={{ width: "100vw", height: "100vh", overflowX: "hidden" }}>
                 <CarrouselProject/>
             </div>
 

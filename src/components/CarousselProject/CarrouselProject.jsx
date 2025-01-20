@@ -1,7 +1,12 @@
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ScrollControls, useScroll, useTexture, Edges } from "@react-three/drei";
+import {
+    ScrollControls,
+    useScroll,
+    useTexture,
+    Edges,
+} from "@react-three/drei";
 import * as THREE from "three";
 import styles from "./CarrouselProject.module.scss";
 
@@ -9,7 +14,7 @@ import styles from "./CarrouselProject.module.scss";
 const carrouselData = [
     {
         id: 0,
-        image: "/img1_.jpg",
+        image: "/SpeedwayGROUPE.jpg",
         title: "Image 1",
         description: "Description de l'image 1",
         color: "#ffbebe",
@@ -84,6 +89,19 @@ function Card3D({ data, onClick, isSelected }) {
     const [hovered, setHovered] = useState(false);
     const texture = useTexture(data.image);
 
+    // Ajustement des propriétés de la texture pour une meilleure qualité
+    useEffect(() => {
+        if (texture) {
+            texture.minFilter = THREE.LinearFilter; // Améliore la qualité lors de la réduction
+            texture.magFilter = THREE.LinearFilter; // Améliore la qualité lors de l'agrandissement
+            texture.anisotropy = 16; // Améliore la qualité à des angles obliques (valeur maximale supportée)
+            texture.needsUpdate = true;
+            texture.flipY = false; // Désactive l'inversion verticale
+
+
+        }
+    }, [texture]);
+
     useFrame(() => {
         if (!groupRef.current) return;
 
@@ -118,15 +136,18 @@ function Card3D({ data, onClick, isSelected }) {
     return (
         <group
             ref={groupRef}
+            className={styles.Card}
             onPointerOver={() => setHovered(true)}
             onPointerOut={() => setHovered(false)}
             onPointerDown={handlePointerDown}
         >
-            <mesh>
+            <mesh
+                rotation={[Math.PI, 9.4, 0]} // **Ajout de la rotation de 180 degrés sur l'axe X**
+            >
                 <planeGeometry args={[1, 1.4]} />
                 <meshBasicMaterial
                     map={texture}
-                    side={THREE.DoubleSide}
+                    side={THREE.DoubleSide} // Rendu à double face
                     toneMapped={false}
                 />
                 <Edges
@@ -135,16 +156,21 @@ function Card3D({ data, onClick, isSelected }) {
                 />
             </mesh>
         </group>
-    );
+);
 }
 
 /**
- * Composant CarrouselGroup
- * - 9 cartes en cercle (index i => angle = i * angleStep)
- * - Rotation pilotée par scroll + offset clic
+* Composant CarrouselGroup
+* - 9 cartes en cercle (index i => angle = i * angleStep)
+* - Rotation pilotée par scroll + offset clic
  * - Au clic => la carte i vient devant la caméra
  */
-function CarrouselGroup({ selectedId, setSelectedId, onSelectColor }) {
+function CarrouselGroup({
+                            selectedId,
+                            setSelectedId,
+                            onSelectColor,
+                            onScroll,
+                        }) {
     const groupRef = useRef();
     const scroll = useScroll();
 
@@ -154,7 +180,6 @@ function CarrouselGroup({ selectedId, setSelectedId, onSelectColor }) {
     // Références pour la rotation courante et l'offset au clic
     const rotationRef = useRef(0);
     const targetRotationRef = useRef(0);
-    const isAnimatingRef = useRef(false);
 
     useFrame(() => {
         if (!groupRef.current) return;
@@ -171,6 +196,11 @@ function CarrouselGroup({ selectedId, setSelectedId, onSelectColor }) {
         );
 
         groupRef.current.rotation.y = rotationRef.current;
+
+        // Appeler la fonction de rappel avec l'offset actuel
+        if (onScroll) {
+            onScroll(scroll.offset);
+        }
     });
 
     function handleCardClick(item, index) {
@@ -178,14 +208,8 @@ function CarrouselGroup({ selectedId, setSelectedId, onSelectColor }) {
         onSelectColor(item.color);
 
         const angle = index * angleStep;
-        // Calcul de l'angle final pour aligner la carte devant la caméra
-        // La caméra regarde vers l'origine depuis [0,0,8], donc le devant correspond à l'axe négatif Z
-        // Pour que la carte sélectionnée soit à l'axe -Z, la rotation doit aligner l'angle de la carte avec 0
-
-        // Calcul de l'angle nécessaire pour que la carte sélectionnée soit à l'angle 0
         const desiredRotation = -angle;
 
-        // Calcul de l'offset nécessaire
         let offset = desiredRotation - rotationRef.current;
 
         // Normalisation de l'offset pour éviter des rotations excessives
@@ -195,12 +219,18 @@ function CarrouselGroup({ selectedId, setSelectedId, onSelectColor }) {
         targetRotationRef.current += offset;
 
         console.log(
-            "Clicked card index:", index,
-            "\n  angle:", angle.toFixed(2),
-            "\n  desiredRotation:", desiredRotation.toFixed(2),
-            "\n  currentRotation:", rotationRef.current.toFixed(2),
-            "\n  offset:", offset.toFixed(2),
-            "\n  newTargetRotation:", (targetRotationRef.current).toFixed(2)
+            "Clicked card index:",
+            index,
+            "\n  angle:",
+            angle.toFixed(2),
+            "\n  desiredRotation:",
+            desiredRotation.toFixed(2),
+            "\n  currentRotation:",
+            rotationRef.current.toFixed(2),
+            "\n  offset:",
+            offset.toFixed(2),
+            "\n  newTargetRotation:",
+            targetRotationRef.current.toFixed(2)
         );
     }
 
@@ -240,8 +270,19 @@ function CarrouselGroup({ selectedId, setSelectedId, onSelectColor }) {
 export default function CarrouselProject() {
     const [selectedId, setSelectedId] = useState(0);
     const [rightColor, setRightColor] = useState(carrouselData[0].color);
+    const [scrollOffset, setScrollOffset] = useState(0);
 
     const selectedData = carrouselData.find((d) => d.id === selectedId);
+
+    // Fonction pour gérer les clics sur la barre de défilement
+    const handleScrollbarClick = (e) => {
+        const scrollbar = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - scrollbar.left;
+        const newOffset = clickX / scrollbar.width;
+        setScrollOffset(newOffset);
+        // Note : Contrôler ScrollControls depuis ici nécessite une référence ou une méthode supplémentaire.
+        // Cela peut être complexe et nécessite une implémentation avancée.
+    };
 
     return (
         <div className={styles.Container}>
@@ -251,6 +292,7 @@ export default function CarrouselProject() {
                     <Canvas
                         camera={{ position: [0, 0, 8], fov: 45 }}
                         style={{ background: "#000" }}
+                        dpr={[1, 2]}
                     >
                         {/* ScrollControls avec 1 page et barres de défilement cachées */}
                         <ScrollControls pages={1} damping={1} hideScrollbars={true}>
@@ -258,11 +300,24 @@ export default function CarrouselProject() {
                                 selectedId={selectedId}
                                 setSelectedId={setSelectedId}
                                 onSelectColor={(c) => setRightColor(c)}
+                                onScroll={(offset) => setScrollOffset(offset)}
                             />
                         </ScrollControls>
                         <ambientLight intensity={0.6} />
                         <directionalLight position={[5, 5, 5]} />
                     </Canvas>
+                </div>
+                {/* Barre de défilement personnalisée positionnée en dessous du Canvas */}
+                <div
+                    className={styles.Scrollbar}
+                    onClick={handleScrollbarClick} // Gestionnaire de clic
+                >
+                    <div
+                        className={styles.Thumb}
+                        style={{
+                            transform: `translateX(${scrollOffset * 450}%)`, // 80% = 100% - largeur du pouce (20%)
+                        }}
+                    />
                 </div>
             </div>
 

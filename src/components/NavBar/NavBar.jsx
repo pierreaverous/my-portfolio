@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader";
 import styles from "./navbar.module.scss";
 import {OrbitControls} from "@react-three/drei";
+import { Suspense } from "react";
 
 /*
   ─────────────────────────────────────────────────────────────────
@@ -263,7 +264,7 @@ const MovingStar = ({ starUrl, onReveal }) => {
             const time = state.clock.getElapsedTime();
 
             if (Math.floor(time * emissionRate) !== Math.floor((time - delta) * emissionRate)) {
-                for (let i = 0; i < 100; i++) {
+                for (let i = 0; i < 10; i++) {
                     const color = Math.random() > 0.5 ? "#0139ff" : "#1d1d1b";
                     const randomOffsetX = (Math.random() - 0.5) * 0.5;
                     const randomOffsetY = (Math.random() - 0.5) * 0.5;
